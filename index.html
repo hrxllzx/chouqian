@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教师教研抽签工具</title>
+<style>
+  :root {
+    --navy: #16324f;
+    --blue: #1f6feb;
+    --blue-dark: #1450b0;
+    --ink: #1a1f2e;
+    --gray: #5b6472;
+    --line: #e3e7ee;
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --gold: #f5a623;
+    --green: #2e9e6b;
+    --red: #d64545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "微软雅黑", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  header .title-wrap { display: flex; align-items: baseline; gap: 16px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: 2px; }
+  header .subtitle { font-size: 1rem; color: #b9c6d6; letter-spacing: 1px; }
+  .header-actions { display: flex; gap: 12px; }
+  .btn {
+    border: none; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-weight: 600;
+    transition: transform .06s ease, box-shadow .12s ease, background .12s ease;
+    user-select: none;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-ghost {
+    background: rgba(255,255,255,.12); color: #fff;
+    padding: 10px 18px; font-size: 1.05rem;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,.22); }
+
+  /* ---------- 主体两栏 ---------- */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding: 28px 32px;
+    align-items: stretch;
+  }
+  .group {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 16px rgba(23,50,79,.06);
+  }
+  .group-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .group-title {
+    font-size: 1.7rem; font-weight: 700; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .badge {
+    display: inline-block; width: 40px; height: 40px; line-height: 40px;
+    text-align: center; border-radius: 10px; color: #fff; font-size: 1.5rem; font-weight: 800;
+  }
+  .badge.a { background: var(--blue); }
+  .badge.b { background: var(--green); }
+  .count-pill {
+    font-size: 1.15rem; color: var(--gray);
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 8px 16px; border-radius: 999px; font-weight: 600;
+  }
+  .count-pill strong { color: var(--navy); font-size: 1.35rem; margin: 0 2px; }
+
+  /* 抽签滚动区 */
+  .slots {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    min-height: 160px; align-content: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .slot {
+    flex: 1 1 0; min-width: 200px; max-width: 360px;
+    background: #fbfcfe;
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 12px;
+    text-align: center;
+    font-size: 2.6rem; font-weight: 700;
+    color: var(--navy);
+    min-height: 118px;
+    display: flex; align-items: center; justify-content: center;
+    word-break: break-all;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .slot.rolling { border-color: #c7d4e8; color: #6b7a90; font-weight: 600; }
+  .slot.selected {
+    border-color: var(--blue);
+    background: #eef4ff;
+    color: var(--blue-dark);
+    animation: pop .5s cubic-bezier(.2,1.4,.4,1);
+    box-shadow: 0 0 0 5px rgba(31,111,235,.12);
+  }
+  .slot.selected.b { border-color: var(--green); background: #ecf8f2; color: #1f7a52; box-shadow: 0 0 0 5px rgba(46,158,107,.12); }
+  @keyframes pop {
+    0% { transform: scale(.94); }
+    55% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  .slot.placeholder { color: #c2cbd8; font-weight: 500; font-size: 1.6rem; }
+
+  /* 本轮已抽 */
+  .drawn-title {
+    font-size: 1.05rem; color: var(--gray); font-weight: 600;
+    margin-bottom: 10px; letter-spacing: 1px;
+  }
+  .drawn-list {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    min-height: 42px;
+  }
+  .chip {
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 14px;
+    font-size: 1.15rem; font-weight: 600; color: #3a4456;
+  }
+  .chip.latest { background: #fff6e0; border-color: var(--gold); color: #9a6b00; font-weight: 700; }
+  .empty-hint { color: #b6bfcc; font-size: 1.05rem; padding: 8px 0; }
+
+  /* ---------- 底栏控制 ---------- */
+  footer {
+    background: #fff;
+    border-top: 1px solid var(--line);
+    padding: 20px 32px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 20px; flex-wrap: wrap;
+  }
+  .btn-primary {
+    background: var(--blue); color: #fff;
+    font-size: 1.5rem; padding: 16px 52px; letter-spacing: 4px;
+    border-radius: 12px; box-shadow: 0 4px 14px rgba(31,111,235,.3);
+  }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-stop {
+    background: var(--red); color: #fff;
+    font-size: 1.5rem; padding: 16px 52px; letter-spacing: 4px;
+    border-radius: 12px; box-shadow: 0 4px 14px rgba(214,69,69,.3);
+  }
+  .btn-stop:hover { background: #b73535; }
+  .btn-reset {
+    background: #fff; color: var(--gray);
+    border: 2px solid var(--line);
+    font-size: 1.3rem; padding: 14px 34px; letter-spacing: 3px;
+    border-radius: 12px;
+  }
+  .btn-reset:hover { border-color: #c7d0dd; color: var(--navy); }
+  .footer-info { font-size: 1.15rem; color: var(--gray); display: flex; align-items: center; }
+  .footer-info strong { color: var(--navy); font-size: 1.4rem; }
+  .footer-count {
+    width: 96px; font-size: 1.6rem; font-weight: 700; text-align: center;
+    color: var(--navy); font-family: inherit;
+    border: 2px solid var(--line); border-radius: 10px; padding: 6px 10px; margin: 0 8px;
+    background: #fff;
+  }
+  .footer-count:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(31,111,235,.12); }
+  .status-line {
+    width: 100%; text-align: center; font-size: 1.05rem; color: var(--red);
+    min-height: 1.3em;
+  }
+
+  /* ---------- 设置面板 ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(15,26,40,.45);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 50; padding: 40px 20px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .panel {
+    background: #fff; border-radius: 16px;
+    width: 100%; max-width: 720px;
+    padding: 28px 32px; box-shadow: 0 12px 40px rgba(0,0,0,.25);
+  }
+  .panel h2 { font-size: 1.5rem; color: var(--navy); margin-bottom: 20px; }
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-size: 1.05rem; font-weight: 600; color: var(--navy); margin-bottom: 8px; }
+  .field .hint { font-weight: 400; color: var(--gray); font-size: .92rem; margin-left: 8px; }
+  input[type=number] {
+    width: 160px; font-size: 1.2rem; padding: 10px 14px;
+    border: 2px solid var(--line); border-radius: 8px; font-family: inherit;
+  }
+  input[type=number]:focus { outline: none; border-color: var(--blue); }
+  textarea {
+    width: 100%; height: 150px; resize: vertical;
+    font-size: 1.05rem; font-family: inherit; line-height: 1.7;
+    padding: 12px 14px; border: 2px solid var(--line); border-radius: 8px;
+  }
+  textarea:focus { outline: none; border-color: var(--blue); }
+  .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .btn-file {
+    background: #eef3fb; color: var(--blue-dark); border: 1px dashed #9db8e8;
+    padding: 9px 16px; font-size: 1rem; border-radius: 8px;
+  }
+  .btn-file:hover { background: #e2ecfb; }
+  .panel-actions { display: flex; gap: 14px; justify-content: flex-end; margin-top: 8px; }
+  .btn-save { background: var(--blue); color: #fff; font-size: 1.2rem; padding: 13px 34px; border-radius: 10px; }
+  .btn-save:hover { background: var(--blue-dark); }
+  .btn-cancel { background: #fff; color: var(--gray); border: 2px solid var(--line); font-size: 1.2rem; padding: 12px 30px; border-radius: 10px; }
+  .file-hidden { display: none; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-wrap">
+    <h1>教师教研抽签</h1>
+    <span class="subtitle">TEACHING &amp; RESEARCH DRAW</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" id="btnSound" title="音效开关">🔊 音效</button>
+    <button class="btn btn-ghost" id="btnSettings">⚙ 名单设置</button>
+  </div>
+</header>
+
+<main>
+  <!-- A 组 -->
+  <section class="group">
+    <div class="group-head">
+      <div class="group-title"><span class="badge a">A</span> A 组</div>
+      <div class="count-pill">剩余 <strong id="countA">0</strong> 人</div>
+    </div>
+    <div class="slots" id="slotsA"></div>
+    <div class="drawn-title">本轮已抽</div>
+    <div class="drawn-list" id="drawnA"></div>
+  </section>
+
+  <!-- B 组 -->
+  <section class="group">
+    <div class="group-head">
+      <div class="group-title"><span class="badge b">B</span> B 组</div>
+      <div class="count-pill">剩余 <strong id="countB">0</strong> 人</div>
+    </div>
+    <div class="slots" id="slotsB"></div>
+    <div class="drawn-title">本轮已抽</div>
+    <div class="drawn-list" id="drawnB"></div>
+  </section>
+</main>
+
+<footer>
+  <button class="btn btn-primary" id="btnStart">开 始 抽 签</button>
+  <button class="btn btn-stop" id="btnStop" disabled>停 止 抽 签</button>
+  <button class="btn btn-reset" id="btnReset">重 置</button>
+  <div class="footer-info">每组抽取
+    <input type="number" id="footerCount" class="footer-count" min="1" max="30" value="1" title="直接输入本次每组抽取人数">
+    人
+  </div>
+  <div class="status-line" id="statusLine"></div>
+</footer>
+
+<!-- 设置面板 -->
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <h2>名单与抽签设置</h2>
+    <div class="field">
+      <label>每次每组抽取人数</label>
+      <input type="number" id="drawCountInput" min="1" max="30" value="1">
+    </div>
+    <div class="field">
+      <label>A 组名单 <span class="hint">每行一个姓名，支持逗号 / 顿号分隔，或直接上传 Excel / txt / csv</span></label>
+      <textarea id="taA"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-file" id="btnUploadA">📄 上传 A 组文件</button>
+        <span class="hint" id="hintA"></span>
+      </div>
+    </div>
+    <div class="field">
+      <label>B 组名单 <span class="hint">每行一个姓名，支持逗号 / 顿号分隔，或直接上传 Excel / txt / csv</span></label>
+      <textarea id="taB"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-file" id="btnUploadB">📄 上传 B 组文件</button>
+        <span class="hint" id="hintB"></span>
+      </div>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-cancel" id="btnCancel">取消</button>
+      <button class="btn btn-save" id="btnSave">保存并生效</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileA" class="file-hidden" accept=".txt,.csv,.text,.xlsx,.xls,.xlsm">
+<input type="file" id="fileB" class="file-hidden" accept=".txt,.csv,.text,.xlsx,.xls,.xlsm">
+
+<script src="xlsx.full.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var STORE = { a: "td_groupA_v1", b: "td_groupB_v1", n: "td_drawCount_v1" };
+
+  var DEFAULT_A = ["陈老师","林老师","黄老师","张老师","李老师","王老师","刘老师","杨老师","赵老师","周老师","吴老师","徐老师","孙老师","马老师","朱老师","胡老师","郭老师","何老师","高老师","罗老师"];
+  var DEFAULT_B = ["郑老师","梁老师","谢老师","宋老师","唐老师","许老师","韩老师","冯老师","邓老师","曹老师","彭老师","曾老师","肖老师","田老师","董老师","袁老师","潘老师","蒋老师","蔡老师","余老师"];
+
+  var masterA = [], masterB = [];
+  var remainingA = [], remainingB = [];
+  var drawnA = [], drawnB = [];
+  var drawCount = 1;
+  var rolling = false;
+  var timer = null;
+  var soundOn = true;
+  var tickCounter = 0;
+  var lastPicked = { a: [], b: [] };
+
+  // DOM
+  var $ = function (id) { return document.getElementById(id); };
+  var slotsA = $("slotsA"), slotsB = $("slotsB");
+  var drawnAEl = $("drawnA"), drawnBEl = $("drawnB");
+  var countA = $("countA"), countB = $("countB");
+  var footerCount = $("footerCount"), statusLine = $("statusLine");
+  var btnStart = $("btnStart"), btnStop = $("btnStop"), btnReset = $("btnReset");
+  var btnSound = $("btnSound"), btnSettings = $("btnSettings");
+  var overlay = $("overlay");
+  var taA = $("taA"), taB = $("taB"), drawCountInput = $("drawCountInput");
+  var fileA = $("fileA"), fileB = $("fileB");
+  var hintA = $("hintA"), hintB = $("hintB");
+
+  // ---------- 工具函数 ----------
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // 从数组中随机抽取 n 个（不重复，按原下标去除，兼容重名）
+  function pickRandom(arr, n) {
+    var idx = [];
+    for (var i = 0; i < arr.length; i++) idx.push(i);
+    idx = shuffle(idx).slice(0, n).sort(function (a, b) { return a - b; });
+    var picked = idx.map(function (i) { return arr[i]; });
+    var pickedSet = {};
+    idx.forEach(function (i) { pickedSet[i] = true; });
+    var rest = arr.filter(function (_, i) { return !pickedSet[i]; });
+    return { picked: picked, rest: rest };
+  }
+
+  function parseNames(text) {
+    return text.split(/[\n\r,，、;；\t]+/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+  }
+
+  // ---------- 音效（Web Audio，无需外部文件） ----------
+  var audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function playTone(freq, dur, type, gain, delay) {
+    if (!audioCtx || !soundOn) return;
+    var t = audioCtx.currentTime + (delay || 0);
+    var osc = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    osc.type = type || "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(gain || 0.15, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + dur);
+  }
+  function playTick() { playTone(920 + Math.random() * 120, 0.035, "square", 0.035); }
+  function playDing() {
+    playTone(1046.5, 0.16, "sine", 0.22, 0);
+    playTone(1318.5, 0.2, "sine", 0.2, 0.09);
+    playTone(1568.0, 0.32, "sine", 0.18, 0.18);
+  }
+
+  // ---------- 存储 ----------
+  function saveStore() {
+    try {
+      localStorage.setItem(STORE.a, taA.value);
+      localStorage.setItem(STORE.b, taB.value);
+      localStorage.setItem(STORE.n, String(drawCount));
+    } catch (e) { /* 忽略存储异常 */ }
+  }
+  function loadStore() {
+    var a = null, b = null, n = null;
+    try { a = localStorage.getItem(STORE.a); b = localStorage.getItem(STORE.b); n = localStorage.getItem(STORE.n); } catch (e) {}
+    taA.value = (a !== null && a !== "") ? a : DEFAULT_A.join("\n");
+    taB.value = (b !== null && b !== "") ? b : DEFAULT_B.join("\n");
+    drawCountInput.value = n ? Math.max(1, Math.min(30, parseInt(n, 10) || 1)) : 1;
+  }
+
+  // ---------- 渲染 ----------
+  function applyLists() {
+    masterA = parseNames(taA.value);
+    masterB = parseNames(taB.value);
+  }
+
+  function renderCounts() {
+    countA.textContent = remainingA.length;
+    countB.textContent = remainingB.length;
+  }
+
+  function renderDrawn() {
+    drawnAEl.innerHTML = drawnA.length
+      ? drawnA.map(function (n, i) {
+          return '<span class="chip' + (lastPicked.a.indexOf(n) >= 0 ? ' latest' : '') + '">' + escapeHtml(n) + '</span>';
+        }).join("")
+      : '<span class="empty-hint">尚未抽取</span>';
+    drawnBEl.innerHTML = drawnB.length
+      ? drawnB.map(function (n, i) {
+          return '<span class="chip' + (lastPicked.b.indexOf(n) >= 0 ? ' latest' : '') + '">' + escapeHtml(n) + '</span>';
+        }).join("")
+      : '<span class="empty-hint">尚未抽取</span>';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function renderSlots(kind, names, cls) {
+    var el = kind === "a" ? slotsA : slotsB;
+    el.innerHTML = "";
+    names.forEach(function (n) {
+      var div = document.createElement("div");
+      div.className = "slot " + (cls || "");
+      div.textContent = n;
+      el.appendChild(div);
+    });
+  }
+
+  function clearSlots() {
+    slotsA.innerHTML = ""; slotsB.innerHTML = "";
+  }
+
+  function renderAll() {
+    renderCounts();
+    renderDrawn();
+    footerCount.value = drawCount;
+  }
+
+  // ---------- 抽签逻辑 ----------
+  function effectiveCount() {
+    return Math.min(drawCount, remainingA.length, remainingB.length);
+  }
+
+  function startDraw() {
+    if (rolling) return;
+    if (masterA.length === 0 || masterB.length === 0) {
+      showStatus("请先在「名单设置」中填写 A、B 两组名单");
+      return;
+    }
+    var n = effectiveCount();
+    if (n < 1) {
+      showStatus("A 组或 B 组剩余人数不足，请点击「重置」开始新一轮");
+      return;
+    }
+    if (n < drawCount) {
+      showStatus("注意：剩余人数不足每组 " + drawCount + " 人，本次每组只抽 " + n + " 人");
+    } else {
+      clearStatus();
+    }
+
+    ensureAudio();
+    rolling = true;
+    lastPicked = { a: [], b: [] };
+
+    // 初始化滚动槽位
+    var slots = [];
+    for (var i = 0; i < n; i++) slots.push(i);
+    renderSlots("a", slots.map(function () { return "？"; }), "rolling");
+    renderSlots("b", slots.map(function () { return "？"; }), "rolling");
+
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    btnReset.disabled = true;
+    tickCounter = 0;
+
+    timer = setInterval(function () {
+      // A 组滚动
+      var aSlotEls = slotsA.querySelectorAll(".slot");
+      var aSample = shuffle(remainingA).slice(0, n);
+      for (var i = 0; i < aSlotEls.length; i++) aSlotEls[i].textContent = aSample[i] || "？";
+      // B 组滚动
+      var bSlotEls = slotsB.querySelectorAll(".slot");
+      var bSample = shuffle(remainingB).slice(0, n);
+      for (var j = 0; j < bSlotEls.length; j++) bSlotEls[j].textContent = bSample[j] || "？";
+
+      tickCounter++;
+      if (tickCounter % 3 === 0) playTick();
+    }, 60);
+  }
+
+  function stopDraw() {
+    if (!rolling) return;
+    rolling = false;
+    if (timer) { clearInterval(timer); timer = null; }
+
+    var n = Math.min(drawCount, remainingA.length, remainingB.length);
+
+    var ra = pickRandom(remainingA, n);
+    var rb = pickRandom(remainingB, n);
+    remainingA = ra.rest;
+    remainingB = rb.rest;
+    drawnA = drawnA.concat(ra.picked);
+    drawnB = drawnB.concat(rb.picked);
+    lastPicked = { a: ra.picked.slice(), b: rb.picked.slice() };
+
+    // 定格并高亮
+    renderSlots("a", ra.picked, "selected");
+    renderSlots("b", rb.picked, "selected b");
+
+    renderAll();
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    btnReset.disabled = false;
+    playDing();
+
+    if (remainingA.length === 0 || remainingB.length === 0) {
+      showStatus("本轮抽取完成，点击「重置」可开始新一轮");
+    }
+  }
+
+  function resetRound() {
+    if (rolling) {
+      rolling = false;
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+    remainingA = masterA.slice();
+    remainingB = masterB.slice();
+    drawnA = []; drawnB = [];
+    lastPicked = { a: [], b: [] };
+    clearSlots();
+    renderAll();
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    btnReset.disabled = false;
+    clearStatus();
+  }
+
+  function showStatus(msg) { statusLine.textContent = msg; }
+  function clearStatus() { statusLine.textContent = ""; }
+
+  // ---------- 设置面板 ----------
+  function openSettings() {
+    applyLists();
+    drawCountInput.value = drawCount;
+    overlay.classList.add("open");
+  }
+  function closeSettings() {
+    overlay.classList.remove("open");
+  }
+  function saveSettings() {
+    applyLists();
+    drawCount = Math.max(1, Math.min(30, parseInt(drawCountInput.value, 10) || 1));
+    if (masterA.length === 0 || masterB.length === 0) {
+      showStatus("名单不能为空");
+      return;
+    }
+    saveStore();
+    resetRound();
+    closeSettings();
+    clearStatus();
+  }
+
+  function readFile(input, ta, hintEl) {
+    var f = input.files && input.files[0];
+    if (!f) return;
+    var ext = (f.name || "").toLowerCase();
+    var isExcel = /\.(xlsx|xlsm|xls|xlt)$/.test(ext);
+
+    if (isExcel) {
+      if (typeof XLSX === "undefined") {
+        hintEl.textContent = "缺少 Excel 解析库（xlsx.full.min.js），请改用 txt/csv";
+        input.value = "";
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: "array" });
+          if (!wb.SheetNames || !wb.SheetNames.length) throw new Error("empty");
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          var names = [];
+          for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            if (!row || !row.length) continue;
+            var s = String(row[0] == null ? "" : row[0]).trim();
+            if (s === "") continue;
+            names.push(s);
+          }
+          // 去掉常见表头（如「姓名」）
+          if (names.length && /^(姓名|名字|名单|姓\s*名|name|序号|编号|no\.?)$/i.test(names[0])) names.shift();
+          ta.value = names.join("\n");
+          hintEl.textContent = "已从第 1 个工作表读取 " + names.length + " 人";
+        } catch (err) {
+          hintEl.textContent = "解析失败，请确认为有效的 Excel 文件";
+        }
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      var tr = new FileReader();
+      tr.onload = function (e) {
+        ta.value = String(e.target.result || "");
+        var names = parseNames(ta.value);
+        hintEl.textContent = "已读取 " + names.length + " 人";
+      };
+      tr.readAsText(f, "utf-8");
+    }
+    input.value = "";
+  }
+
+  // ---------- 事件绑定 ----------
+  btnStart.addEventListener("click", startDraw);
+  btnStop.addEventListener("click", stopDraw);
+  btnReset.addEventListener("click", resetRound);
+  btnSound.addEventListener("click", function () {
+    soundOn = !soundOn;
+    btnSound.textContent = soundOn ? "🔊 音效" : "🔇 静音";
+    if (soundOn) ensureAudio();
+  });
+  btnSettings.addEventListener("click", openSettings);
+  footerCount.addEventListener("input", function () {
+    var v = parseInt(footerCount.value, 10);
+    if (v >= 1) drawCount = Math.min(30, v);
+    drawCountInput.value = drawCount;
+  });
+  footerCount.addEventListener("change", function () {
+    drawCount = Math.max(1, Math.min(30, parseInt(footerCount.value, 10) || 1));
+    footerCount.value = drawCount;
+    drawCountInput.value = drawCount;
+    saveStore();
+  });
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSettings(); });
+  $("btnCancel").addEventListener("click", closeSettings);
+  $("btnSave").addEventListener("click", saveSettings);
+  $("btnUploadA").addEventListener("click", function () { fileA.click(); });
+  $("btnUploadB").addEventListener("click", function () { fileB.click(); });
+  fileA.addEventListener("change", function () { readFile(fileA, taA, hintA); });
+  fileB.addEventListener("change", function () { readFile(fileB, taB, hintB); });
+
+  // 空格键 = 开始/停止
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && !overlay.classList.contains("open")) {
+      e.preventDefault();
+      if (rolling) stopDraw(); else startDraw();
+    }
+    if (e.key === "Escape") closeSettings();
+  });
+
+  // ---------- 初始化 ----------
+  loadStore();
+  applyLists();
+  drawCount = Math.max(1, Math.min(30, parseInt(drawCountInput.value, 10) || 1));
+  remainingA = masterA.slice();
+  remainingB = masterB.slice();
+  renderAll();
+})();
+</script>
+</body>
+</html>
