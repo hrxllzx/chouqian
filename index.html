@@ -58,11 +58,11 @@
   }
   .btn-ghost:hover { background: rgba(255,255,255,.22); }
 
-  /* ---------- 主体两栏 ---------- */
+  /* ---------- 主体三栏 ---------- */
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 24px;
     padding: 28px 32px;
     align-items: stretch;
@@ -90,6 +90,7 @@
   }
   .badge.a { background: var(--blue); }
   .badge.b { background: var(--green); }
+  .badge.c { background: var(--gold); }
   .count-pill {
     font-size: 1.15rem; color: var(--gray);
     background: var(--bg); border: 1px solid var(--line);
@@ -126,6 +127,7 @@
     box-shadow: 0 0 0 5px rgba(31,111,235,.12);
   }
   .slot.selected.b { border-color: var(--green); background: #ecf8f2; color: #1f7a52; box-shadow: 0 0 0 5px rgba(46,158,107,.12); }
+  .slot.selected.c { border-color: var(--gold); background: #fff3e0; color: #9a6b00; box-shadow: 0 0 0 5px rgba(245,166,35,.12); }
   @keyframes pop {
     0% { transform: scale(.94); }
     55% { transform: scale(1.05); }
@@ -230,6 +232,9 @@
   .btn-cancel { background: #fff; color: var(--gray); border: 2px solid var(--line); font-size: 1.2rem; padding: 12px 30px; border-radius: 10px; }
   .file-hidden { display: none; }
 
+  @media (max-width: 1200px) {
+    main { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; }
   }
@@ -270,6 +275,17 @@
     <div class="drawn-title">本轮已抽</div>
     <div class="drawn-list" id="drawnB"></div>
   </section>
+
+  <!-- C 组 -->
+  <section class="group">
+    <div class="group-head">
+      <div class="group-title"><span class="badge c">C</span> C 组</div>
+      <div class="count-pill">剩余 <strong id="countC">0</strong> 人</div>
+    </div>
+    <div class="slots" id="slotsC"></div>
+    <div class="drawn-title">本轮已抽</div>
+    <div class="drawn-list" id="drawnC"></div>
+  </section>
 </main>
 
 <footer>
@@ -307,6 +323,14 @@
         <span class="hint" id="hintB"></span>
       </div>
     </div>
+    <div class="field">
+      <label>C 组名单 <span class="hint">每行一个姓名，支持逗号 / 顿号分隔，或直接上传 Excel / txt / csv</span></label>
+      <textarea id="taC"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-file" id="btnUploadC">📄 上传 C 组文件</button>
+        <span class="hint" id="hintC"></span>
+      </div>
+    </div>
     <div class="panel-actions">
       <button class="btn btn-cancel" id="btnCancel">取消</button>
       <button class="btn btn-save" id="btnSave">保存并生效</button>
@@ -316,39 +340,46 @@
 
 <input type="file" id="fileA" class="file-hidden" accept=".txt,.csv,.text,.xlsx,.xls,.xlsm">
 <input type="file" id="fileB" class="file-hidden" accept=".txt,.csv,.text,.xlsx,.xls,.xlsm">
+<input type="file" id="fileC" class="file-hidden" accept=".txt,.csv,.text,.xlsx,.xls,.xlsm">
 
 <script src="xlsx.full.min.js"></script>
 <script>
 (function () {
   "use strict";
 
-  var STORE = { a: "td_groupA_v1", b: "td_groupB_v1", n: "td_drawCount_v1" };
+  var STORE = { a: "td_groupA_v1", b: "td_groupB_v1", c: "td_groupC_v1", n: "td_drawCount_v1" };
 
   var DEFAULT_A = ["陈老师","林老师","黄老师","张老师","李老师","王老师","刘老师","杨老师","赵老师","周老师","吴老师","徐老师","孙老师","马老师","朱老师","胡老师","郭老师","何老师","高老师","罗老师"];
   var DEFAULT_B = ["郑老师","梁老师","谢老师","宋老师","唐老师","许老师","韩老师","冯老师","邓老师","曹老师","彭老师","曾老师","肖老师","田老师","董老师","袁老师","潘老师","蒋老师","蔡老师","余老师"];
+  var DEFAULT_C = ["杜老师","丁老师","苏老师","魏老师","吕老师","严老师","金老师","顾老师","侯老师","邵老师","孟老师","龙老师","万老师","段老师","雷老师","钱老师","汤老师","尹老师","黎老师","易老师"];
 
-  var masterA = [], masterB = [];
-  var remainingA = [], remainingB = [];
-  var drawnA = [], drawnB = [];
+  var masterA = [], masterB = [], masterC = [];
+  var remainingA = [], remainingB = [], remainingC = [];
+  var drawnA = [], drawnB = [], drawnC = [];
   var drawCount = 1;
   var rolling = false;
   var timer = null;
   var soundOn = true;
   var tickCounter = 0;
-  var lastPicked = { a: [], b: [] };
+  var lastPicked = { a: [], b: [], c: [] };
 
   // DOM
   var $ = function (id) { return document.getElementById(id); };
-  var slotsA = $("slotsA"), slotsB = $("slotsB");
-  var drawnAEl = $("drawnA"), drawnBEl = $("drawnB");
-  var countA = $("countA"), countB = $("countB");
+  var slotsA = $("slotsA"), slotsB = $("slotsB"), slotsC = $("slotsC");
+  var drawnAEl = $("drawnA"), drawnBEl = $("drawnB"), drawnCEl = $("drawnC");
+  var countA = $("countA"), countB = $("countB"), countC = $("countC");
   var footerCount = $("footerCount"), statusLine = $("statusLine");
   var btnStart = $("btnStart"), btnStop = $("btnStop"), btnReset = $("btnReset");
   var btnSound = $("btnSound"), btnSettings = $("btnSettings");
   var overlay = $("overlay");
-  var taA = $("taA"), taB = $("taB"), drawCountInput = $("drawCountInput");
-  var fileA = $("fileA"), fileB = $("fileB");
-  var hintA = $("hintA"), hintB = $("hintB");
+  var taA = $("taA"), taB = $("taB"), taC = $("taC"), drawCountInput = $("drawCountInput");
+  var fileA = $("fileA"), fileB = $("fileB"), fileC = $("fileC");
+  var hintA = $("hintA"), hintB = $("hintB"), hintC = $("hintC");
+
+  // 各组的槽位 / 已抽 / 计数 DOM 映射
+  var SLOT_ELS = { a: slotsA, b: slotsB, c: slotsC };
+  var DRAWN_ELS = { a: drawnAEl, b: drawnBEl, c: drawnCEl };
+  var COUNT_ELS = { a: countA, b: countB, c: countC };
 
   // ---------- 工具函数 ----------
   function shuffle(arr) {
@@ -411,14 +442,16 @@
     try {
       localStorage.setItem(STORE.a, taA.value);
       localStorage.setItem(STORE.b, taB.value);
+      localStorage.setItem(STORE.c, taC.value);
       localStorage.setItem(STORE.n, String(drawCount));
     } catch (e) { /* 忽略存储异常 */ }
   }
   function loadStore() {
-    var a = null, b = null, n = null;
-    try { a = localStorage.getItem(STORE.a); b = localStorage.getItem(STORE.b); n = localStorage.getItem(STORE.n); } catch (e) {}
+    var a = null, b = null, c = null, n = null;
+    try { a = localStorage.getItem(STORE.a); b = localStorage.getItem(STORE.b); c = localStorage.getItem(STORE.c); n = localStorage.getItem(STORE.n); } catch (e) {}
     taA.value = (a !== null && a !== "") ? a : DEFAULT_A.join("\n");
     taB.value = (b !== null && b !== "") ? b : DEFAULT_B.join("\n");
+    taC.value = (c !== null && c !== "") ? c : DEFAULT_C.join("\n");
     drawCountInput.value = n ? Math.max(1, Math.min(30, parseInt(n, 10) || 1)) : 1;
   }
 
@@ -426,24 +459,28 @@
   function applyLists() {
     masterA = parseNames(taA.value);
     masterB = parseNames(taB.value);
+    masterC = parseNames(taC.value);
   }
 
   function renderCounts() {
     countA.textContent = remainingA.length;
     countB.textContent = remainingB.length;
+    countC.textContent = remainingC.length;
   }
 
   function renderDrawn() {
-    drawnAEl.innerHTML = drawnA.length
-      ? drawnA.map(function (n, i) {
-          return '<span class="chip' + (lastPicked.a.indexOf(n) >= 0 ? ' latest' : '') + '">' + escapeHtml(n) + '</span>';
-        }).join("")
-      : '<span class="empty-hint">尚未抽取</span>';
-    drawnBEl.innerHTML = drawnB.length
-      ? drawnB.map(function (n, i) {
-          return '<span class="chip' + (lastPicked.b.indexOf(n) >= 0 ? ' latest' : '') + '">' + escapeHtml(n) + '</span>';
-        }).join("")
-      : '<span class="empty-hint">尚未抽取</span>';
+    var groups = [
+      { el: drawnAEl, list: drawnA, key: "a" },
+      { el: drawnBEl, list: drawnB, key: "b" },
+      { el: drawnCEl, list: drawnC, key: "c" }
+    ];
+    groups.forEach(function (g) {
+      g.el.innerHTML = g.list.length
+        ? g.list.map(function (n) {
+            return '<span class="chip' + (lastPicked[g.key].indexOf(n) >= 0 ? ' latest' : '') + '">' + escapeHtml(n) + '</span>';
+          }).join("")
+        : '<span class="empty-hint">尚未抽取</span>';
+    });
   }
 
   function escapeHtml(s) {
@@ -453,7 +490,7 @@
   }
 
   function renderSlots(kind, names, cls) {
-    var el = kind === "a" ? slotsA : slotsB;
+    var el = SLOT_ELS[kind];
     el.innerHTML = "";
     names.forEach(function (n) {
       var div = document.createElement("div");
@@ -464,7 +501,7 @@
   }
 
   function clearSlots() {
-    slotsA.innerHTML = ""; slotsB.innerHTML = "";
+    slotsA.innerHTML = ""; slotsB.innerHTML = ""; slotsC.innerHTML = "";
   }
 
   function renderAll() {
@@ -475,18 +512,18 @@
 
   // ---------- 抽签逻辑 ----------
   function effectiveCount() {
-    return Math.min(drawCount, remainingA.length, remainingB.length);
+    return Math.min(drawCount, remainingA.length, remainingB.length, remainingC.length);
   }
 
   function startDraw() {
     if (rolling) return;
-    if (masterA.length === 0 || masterB.length === 0) {
-      showStatus("请先在「名单设置」中填写 A、B 两组名单");
+    if (masterA.length === 0 || masterB.length === 0 || masterC.length === 0) {
+      showStatus("请先在「名单设置」中填写 A、B、C 三组名单");
       return;
     }
     var n = effectiveCount();
     if (n < 1) {
-      showStatus("A 组或 B 组剩余人数不足，请点击「重置」开始新一轮");
+      showStatus("某一组剩余人数不足，请点击「重置」开始新一轮");
       return;
     }
     if (n < drawCount) {
@@ -497,13 +534,14 @@
 
     ensureAudio();
     rolling = true;
-    lastPicked = { a: [], b: [] };
+    lastPicked = { a: [], b: [], c: [] };
 
     // 初始化滚动槽位
     var slots = [];
     for (var i = 0; i < n; i++) slots.push(i);
     renderSlots("a", slots.map(function () { return "？"; }), "rolling");
     renderSlots("b", slots.map(function () { return "？"; }), "rolling");
+    renderSlots("c", slots.map(function () { return "？"; }), "rolling");
 
     btnStart.disabled = true;
     btnStop.disabled = false;
@@ -519,6 +557,10 @@
       var bSlotEls = slotsB.querySelectorAll(".slot");
       var bSample = shuffle(remainingB).slice(0, n);
       for (var j = 0; j < bSlotEls.length; j++) bSlotEls[j].textContent = bSample[j] || "？";
+      // C 组滚动
+      var cSlotEls = slotsC.querySelectorAll(".slot");
+      var cSample = shuffle(remainingC).slice(0, n);
+      for (var k = 0; k < cSlotEls.length; k++) cSlotEls[k].textContent = cSample[k] || "？";
 
       tickCounter++;
       if (tickCounter % 3 === 0) playTick();
@@ -530,19 +572,23 @@
     rolling = false;
     if (timer) { clearInterval(timer); timer = null; }
 
-    var n = Math.min(drawCount, remainingA.length, remainingB.length);
+    var n = Math.min(drawCount, remainingA.length, remainingB.length, remainingC.length);
 
     var ra = pickRandom(remainingA, n);
     var rb = pickRandom(remainingB, n);
+    var rc = pickRandom(remainingC, n);
     remainingA = ra.rest;
     remainingB = rb.rest;
+    remainingC = rc.rest;
     drawnA = drawnA.concat(ra.picked);
     drawnB = drawnB.concat(rb.picked);
-    lastPicked = { a: ra.picked.slice(), b: rb.picked.slice() };
+    drawnC = drawnC.concat(rc.picked);
+    lastPicked = { a: ra.picked.slice(), b: rb.picked.slice(), c: rc.picked.slice() };
 
     // 定格并高亮
     renderSlots("a", ra.picked, "selected");
     renderSlots("b", rb.picked, "selected b");
+    renderSlots("c", rc.picked, "selected c");
 
     renderAll();
     btnStart.disabled = false;
@@ -550,7 +596,7 @@
     btnReset.disabled = false;
     playDing();
 
-    if (remainingA.length === 0 || remainingB.length === 0) {
+    if (remainingA.length === 0 || remainingB.length === 0 || remainingC.length === 0) {
       showStatus("本轮抽取完成，点击「重置」可开始新一轮");
     }
   }
@@ -562,8 +608,9 @@
     }
     remainingA = masterA.slice();
     remainingB = masterB.slice();
-    drawnA = []; drawnB = [];
-    lastPicked = { a: [], b: [] };
+    remainingC = masterC.slice();
+    drawnA = []; drawnB = []; drawnC = [];
+    lastPicked = { a: [], b: [], c: [] };
     clearSlots();
     renderAll();
     btnStart.disabled = false;
@@ -587,7 +634,7 @@
   function saveSettings() {
     applyLists();
     drawCount = Math.max(1, Math.min(30, parseInt(drawCountInput.value, 10) || 1));
-    if (masterA.length === 0 || masterB.length === 0) {
+    if (masterA.length === 0 || masterB.length === 0 || masterC.length === 0) {
       showStatus("名单不能为空");
       return;
     }
@@ -672,8 +719,10 @@
   $("btnSave").addEventListener("click", saveSettings);
   $("btnUploadA").addEventListener("click", function () { fileA.click(); });
   $("btnUploadB").addEventListener("click", function () { fileB.click(); });
+  $("btnUploadC").addEventListener("click", function () { fileC.click(); });
   fileA.addEventListener("change", function () { readFile(fileA, taA, hintA); });
   fileB.addEventListener("change", function () { readFile(fileB, taB, hintB); });
+  fileC.addEventListener("change", function () { readFile(fileC, taC, hintC); });
 
   // 空格键 = 开始/停止
   document.addEventListener("keydown", function (e) {
@@ -690,6 +739,7 @@
   drawCount = Math.max(1, Math.min(30, parseInt(drawCountInput.value, 10) || 1));
   remainingA = masterA.slice();
   remainingB = masterB.slice();
+  remainingC = masterC.slice();
   renderAll();
 })();
 </script>
